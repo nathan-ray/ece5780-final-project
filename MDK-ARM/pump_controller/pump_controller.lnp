@@ -1,0 +1,25 @@
+--cpu Cortex-M0
+"pump_controller\startup_stm32f072xb.o"
+"pump_controller\main.o"
+"pump_controller\stm32f0xx_it.o"
+"pump_controller\stm32f0xx_hal_msp.o"
+"pump_controller\stm32f0xx_hal_tim.o"
+"pump_controller\stm32f0xx_hal_tim_ex.o"
+"pump_controller\stm32f0xx_hal_rcc.o"
+"pump_controller\stm32f0xx_hal_rcc_ex.o"
+"pump_controller\stm32f0xx_hal.o"
+"pump_controller\stm32f0xx_hal_i2c.o"
+"pump_controller\stm32f0xx_hal_i2c_ex.o"
+"pump_controller\stm32f0xx_hal_gpio.o"
+"pump_controller\stm32f0xx_hal_dma.o"
+"pump_controller\stm32f0xx_hal_cortex.o"
+"pump_controller\stm32f0xx_hal_pwr.o"
+"pump_controller\stm32f0xx_hal_pwr_ex.o"
+"pump_controller\stm32f0xx_hal_flash.o"
+"pump_controller\stm32f0xx_hal_flash_ex.o"
+"pump_controller\stm32f0xx_hal_exti.o"
+"pump_controller\system_stm32f0xx.o"
+--strict --scatter "pump_controller\pump_controller.sct"
+--summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols
+--info sizes --info totals --info unused --info veneers
+--list "pump_controller.map" -o pump_controller\pump_controller.axf
