@@ -29,7 +29,6 @@ volatile char commands[5];
 void transmitChar(char c) {
 	// continue looping if transmit data register is empty, continue when there is data
 	while ( (USART3->ISR & 128) == 0) {
-		
 	}
 	
 	USART3->TDR = c;
@@ -83,7 +82,7 @@ int main(void)
   HAL_Init();
   SystemClock_Config();
 	
-	// LED SETUP
+	// LED SETUP ################################################################################################
 	__HAL_RCC_GPIOC_CLK_ENABLE(); // Enable the GPIOC clock in the RCC
 	// GREEN  -> 9
 	// ORANGE -> 8
@@ -100,6 +99,7 @@ int main(void)
 	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET); // Start PC8 reset
 	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET); // Start PC9 reset
 	
+	// UART SETUP ################################################################################################
 	// USART3_RX = PC5
 	// USART3_TX = PC4
 	// USB-UART Transmit 	(TX) -> STM32F0 Receive 	(RX)
@@ -148,6 +148,55 @@ int main(void)
 	
 	
 	USART3->CR1 |= (1 << 0);		// enable USART
+	
+	// PWM SETUP ################################################################################################
+	// ENABLE TIM3
+	RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;
+
+	// Frequency target = 800, Fclock = 8 000 000
+	// 800 = 8 000 000 / ( (PSC + 1) * ARR )
+	// PSC + 1 = 4, PSC = 3
+	// ARR = 2500
+  TIM3->PSC = 3;
+  TIM3->ARR = 2500;
+	
+	// SET OUTPUT for channel 1
+	TIM3->CCMR1 &= ~(1 << 1);
+	TIM3->CCMR1 &= ~(1 << 0);
+	
+	// PWM Mode 2 for channel 1
+	TIM3->CCMR1 |= (1 << 6);
+	TIM3->CCMR1 |= (1 << 5);
+	TIM3->CCMR1 |= (1 << 4);
+	
+	// ENABLE OUTPUT for channel 1
+	TIM3->CCER |= (1 << 0);
+	
+	// ENABLE PRELOAD for channel 1
+	TIM3->CCMR1 |= (1 << 3);
+	
+	// SET OUTPUT for channel 2
+	TIM3->CCMR1 &= ~(1 << 9);
+	TIM3->CCMR1 &= ~(1 << 8);
+	
+	// PWM Mode 1 for channel 2
+	TIM3->CCMR1 |= (1 << 14);
+	TIM3->CCMR1 |= (1 << 13);
+	TIM3->CCMR1 &= ~(1 << 12);
+	
+	// ENABLE OUTPUT for channel 2
+	TIM3->CCER |= (1 << 4);
+	
+	// ENABLE PRELOAD for channel 2
+	TIM3->CCMR1 |= (1 << 11);
+	
+	// experimenting with different CCRx values, 100% and 20%
+  TIM3->CCR1 = 50; 
+  TIM3->CCR2 = 50; 
+	
+	// ENABLE TIMER 3
+	TIM3->CR1 |= (1 << 0);
+
 	
 	
   while (1)
