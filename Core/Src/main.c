@@ -186,7 +186,11 @@ int main(void)
 	// ENABLE PRELOAD for channel 2
 	TIM3->CCMR1 |= (1 << 11);
 	
-	// experimenting with different CCRx values, 100% and 20%
+	// ADJUST DUTY-CYCLE WHERE FOR SERVOS (NOT THOROUGHLY TESTED)
+	// 0 deg 		-> 2500
+	// 45 deg 	-> 3750
+	// 90 deg 	-> 4550
+	
   TIM3->CCR1 = 2500;	// 5%
   TIM3->CCR2 = 2500; 	// 5%
 	
