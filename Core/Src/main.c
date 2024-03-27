@@ -153,51 +153,45 @@ int main(void)
 	// ENABLE TIM3
 	RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;
 
-	// Frequency target = 800, Fclock = 8 000 000
-	// 800 = 8 000 000 / ( (PSC + 1) * ARR )
+	// Frequency target = 50, Fclock = 8 000 000
+	// 50 = 8 000 000 / ( (PSC + 1) * ARR )
 	// PSC + 1 = 4, PSC = 3
-	// ARR = 2500
+	// ARR = 50000
   TIM3->PSC = 3;
-  TIM3->ARR = 2500;
+  TIM3->ARR = 50000;
 	
+	// PC6 -> CHANNEL 1 
 	// SET OUTPUT for channel 1
 	TIM3->CCMR1 &= ~(1 << 1);
-	TIM3->CCMR1 &= ~(1 << 0);
-	
-	// PWM Mode 2 for channel 1
+	TIM3->CCMR1 &= ~(1 << 0);	
+	// PWM Mode 1 for channel 1
 	TIM3->CCMR1 |= (1 << 6);
 	TIM3->CCMR1 |= (1 << 5);
-	TIM3->CCMR1 |= (1 << 4);
-	
+	TIM3->CCMR1 &= ~(1 << 4);
 	// ENABLE OUTPUT for channel 1
 	TIM3->CCER |= (1 << 0);
-	
 	// ENABLE PRELOAD for channel 1
 	TIM3->CCMR1 |= (1 << 3);
 	
+	// PC7 -> CHANNEL 2
 	// SET OUTPUT for channel 2
 	TIM3->CCMR1 &= ~(1 << 9);
 	TIM3->CCMR1 &= ~(1 << 8);
-	
 	// PWM Mode 1 for channel 2
 	TIM3->CCMR1 |= (1 << 14);
 	TIM3->CCMR1 |= (1 << 13);
 	TIM3->CCMR1 &= ~(1 << 12);
-	
 	// ENABLE OUTPUT for channel 2
 	TIM3->CCER |= (1 << 4);
-	
 	// ENABLE PRELOAD for channel 2
 	TIM3->CCMR1 |= (1 << 11);
 	
 	// experimenting with different CCRx values, 100% and 20%
-  TIM3->CCR1 = 50; 
-  TIM3->CCR2 = 50; 
+  TIM3->CCR1 = 2500;	// 5%
+  TIM3->CCR2 = 2500; 	// 5%
 	
 	// ENABLE TIMER 3
 	TIM3->CR1 |= (1 << 0);
-
-	
 	
   while (1)
   {
