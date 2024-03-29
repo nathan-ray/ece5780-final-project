@@ -20,11 +20,31 @@ void SystemClock_Config(void);
 void transmitChar(char c);
 void transmitString(char string[]);
 void USART3_4_IRQHandler();
+void updateServoX(int direction);
+void updateServoY(int direction);
 
 const int NDATA = 5;
 volatile int new_data = 0;
 // [space, up, down, left, right]
 volatile char commands[5];
+
+// variables
+volatile int space = 0;
+volatile int up = 0;
+volatile int down = 0;
+volatile int left = 0;
+volatile int right = 0;
+
+volatile int currX = 3500;
+volatile int currY = 3500;
+
+const int MAX = 950;
+const int MIN = 5000;
+
+const int UP = 0;
+const int DOWN = 1;
+const int LEFT = 0;
+const int RIGHT = 1;
 
 void transmitChar(char c) {
 	// continue looping if transmit data register is empty, continue when there is data
@@ -73,6 +93,18 @@ void USART3_4_IRQHandler() {
 
 }
 
+void updateServoY(int direction) {
+	HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_8);
+	if (direction == UP) currY += 100;
+	else currY -= 100;
+	if (currY > MAX) currY = MAX;
+	else if (currY < MIN) currY = MIN;
+	TIM3->CR1 &= ~(1 << 0);
+	TIM3->CCR2 = currY; // 0 deg
+	TIM3->CR1 |= (1 << 0);
+	HAL_Delay(500);
+}
+
 /**
   * @brief  The application entry point.
   * @retval int
@@ -102,6 +134,8 @@ int main(void)
 	// UART SETUP ################################################################################################
 	// USART3_RX = PC5
 	// USART3_TX = PC4
+	// PI_TX = 8
+	// PI_RX = 10
 	// USB-UART Transmit 	(TX) -> STM32F0 Receive 	(RX)
 	// USB-UART Receive 	(RX) -> STM32F0 Transmit 	(TX)
 	
@@ -213,22 +247,27 @@ int main(void)
 			HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_7);
 			HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_8);
 			HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_9);
+			space = 1;
 			HAL_Delay(50);
 		}
 		else {
-
+			space = 0;
 		}
 		if (commands[1] == '1') { // up
-			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
+			//HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
+			updateServoY(UP);
 		}
 		else {
 			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
+			up = 0;
 		}
 		if (commands[2] == '1') { // down
 			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_SET);
+			down = 1;
 		}
 		else {
 			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_RESET);
+			down = 0;
 		}
 		if (commands[3] == '1') { // left
 			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_SET);
