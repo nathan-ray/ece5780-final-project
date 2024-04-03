@@ -35,16 +35,19 @@ volatile int down = 0;
 volatile int left = 0;
 volatile int right = 0;
 
-volatile int currX = 3500;
-volatile int currY = 3500;
+int currX = 3500;
+int currY = 0;
+int delay = 0;
 
-const int MAX = 950;
-const int MIN = 5000;
+const int MAX = 5000;
+const int MIN = 950;
+const int DELAY_TIME = 10000;
+const int INCS = 50;
 
 const int UP = 0;
 const int DOWN = 1;
-const int LEFT = 0;
-const int RIGHT = 1;
+const int LEFT = 2;
+const int RIGHT = 3;
 
 void transmitChar(char c) {
 	// continue looping if transmit data register is empty, continue when there is data
@@ -93,17 +96,46 @@ void USART3_4_IRQHandler() {
 
 }
 
+void updateServoX(int direction) {
+	
+	if (delay < DELAY_TIME) {
+		delay++;
+		return;
+	}
+	
+	delay = 0;
+	if (direction == LEFT) currX += INCS;
+	else if (direction == RIGHT) currX -= INCS;
+	else return;
+	
+	if (currX > MAX) currX = MAX;
+	else if (currX < MIN) currX = MIN;
+	
+	TIM3->CR1 &= ~(1 << 0);
+	TIM3->CCR1 = currX;
+	TIM3->CR1 |= (1 << 0);
+}
+
 void updateServoY(int direction) {
-	HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_8);
-	if (direction == UP) currY += 100;
-	else currY -= 100;
+	
+	if (delay < DELAY_TIME) {
+		delay++;
+		return;
+	}
+	
+	delay = 0;
+	if (direction == UP) currY += INCS;
+	else if (direction == DOWN) currY -= INCS;
+	else return;
+	
 	if (currY > MAX) currY = MAX;
 	else if (currY < MIN) currY = MIN;
+	
 	TIM3->CR1 &= ~(1 << 0);
-	TIM3->CCR2 = currY; // 0 deg
+	TIM3->CCR2 = currY;
 	TIM3->CR1 |= (1 << 0);
-	HAL_Delay(500);
 }
+
 
 /**
   * @brief  The application entry point.
@@ -121,16 +153,15 @@ int main(void)
 	// BLUE		-> 7
 	// RED		-> 6
 	// Set up a configuration struct to pass to the initialization function
-	GPIO_InitTypeDef initStr = {GPIO_PIN_6 | GPIO_PIN_7 | GPIO_PIN_8 | GPIO_PIN_9,
+	GPIO_InitTypeDef initStr = {GPIO_PIN_9, // GPIO_PIN_6 | GPIO_PIN_7 | GPIO_PIN_8 | 
 	GPIO_MODE_OUTPUT_PP,
 	GPIO_SPEED_FREQ_LOW,
 	GPIO_NOPULL};
 	HAL_GPIO_Init(GPIOC, &initStr); // Initialize pins PC6, PC7, PC8 & PC9
-	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET); // Start PC6 reset
-	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_RESET); // Start PC7 reset
-	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET); // Start PC8 reset
+	//HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET); // Start PC6 reset
+	//HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_RESET); // Start PC7 reset
+	//HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET); // Start PC8 reset
 	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET); // Start PC9 reset
-	
 	// UART SETUP ################################################################################################
 	// USART3_RX = PC5
 	// USART3_TX = PC4
@@ -179,11 +210,34 @@ int main(void)
 	USART3->CR1 |= (1 << 5);
 	NVIC_EnableIRQ(29);
 	NVIC_SetPriority(29, 1);
-	
-	
+
 	USART3->CR1 |= (1 << 0);		// enable USART
 	
 	// PWM SETUP ################################################################################################
+	
+	// Initialize LEDs 
+  // Blue LED (PC7)
+	// set to Alternate Function
+  GPIOC->MODER &= ~(1 << 14);
+  GPIOC->MODER |= (1 << 15);
+	
+  GPIOC->OTYPER &= ~(1 << 7);
+  GPIOC->OSPEEDR &= ~(1 << 14);
+  GPIOC->OSPEEDR &= ~(1 << 15);
+  GPIOC->PUPDR &= ~(1 << 14);
+  GPIOC->PUPDR &= ~(1 << 15);
+
+  // Red LED (PC6)
+	// set to Alternate Function
+  GPIOC->MODER &= ~(1 << 12);
+  GPIOC->MODER |= (1 << 13);
+	
+  GPIOC->OTYPER &= ~(1 << 6);
+  GPIOC->OSPEEDR &= ~(1 << 12);
+  GPIOC->OSPEEDR &= ~(1 << 13);
+  GPIOC->PUPDR &= ~(1 << 12); 
+  GPIOC->PUPDR &= ~(1 << 13); 
+	
 	// ENABLE TIM3
 	RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;
 
@@ -225,63 +279,62 @@ int main(void)
 	// 45 deg 	-> 3750
 	// 90 deg 	-> 4550
 	
-  TIM3->CCR1 = 2500;	// 5%
-  TIM3->CCR2 = 2500; 	// 5%
+  TIM3->CCR1 = currX;
+  TIM3->CCR2 = currY;
 	
 	// ENABLE TIMER 3
 	TIM3->CR1 |= (1 << 0);
 	
+
   while (1)
   {
-		
 		new_data = 0;
 		
 		// wait until all data (5 bytes) are received.
 		while(new_data != 5) {
-		
+			
+			if (up == 1) {
+				HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_SET);
+				updateServoY(UP);
+				continue;
+			}
+			if (down == 1) {
+				HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_SET);
+				updateServoY(DOWN);
+				continue;
+			}
+			
+			if (left == 1) {
+				continue;
+			}
+			
+			if (right == 1) {
+				continue;
+			}
+			
+			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET);
+			delay = DELAY_TIME + 1;
+			TIM3->CR1 &= ~(1 << 0);
+			TIM3->CCR2 = 0;
+			TIM3->CR1 |= (1 << 0);
 		}
 		
 		// PARSE COMMANDS
-		if (commands[0] == '1') { // space
-			HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_6);
-			HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_7);
-			HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_8);
-			HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_9);
-			space = 1;
-			HAL_Delay(50);
-		}
-		else {
-			space = 0;
-		}
-		if (commands[1] == '1') { // up
-			//HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_SET);
-			updateServoY(UP);
-		}
-		else {
-			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
-			up = 0;
-		}
-		if (commands[2] == '1') { // down
-			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_SET);
-			down = 1;
-		}
-		else {
-			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_RESET);
-			down = 0;
-		}
-		if (commands[3] == '1') { // left
-			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_SET);
-		}
-		else {
-			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET);
-		}
-		if (commands[4] == '1') { // right
-			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_SET);
-		}
-		else {
-			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET);
-		}
-  }
+		if (commands[0] == '1') space = 1; // space
+		else space = 0;
+		
+		if (commands[1] == '1') up = 1;	// up
+		else up = 0;
+		
+		if (commands[2] == '1') down = 1; // down
+		else down = 0;
+		
+		if (commands[3] == '1') left = 1; // left
+		else left = 0;
+		
+		if (commands[4] == '1') right = 1; // right
+		else right = 0;
+
 }
 
 /**
