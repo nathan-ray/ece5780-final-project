@@ -22,9 +22,9 @@ void transmitString(char string[]);
 void USART3_4_IRQHandler();
 void updateServoX(int direction);
 void updateServoY(int direction);
+void readCommands();
+void parseCommands();
 
-const int NDATA = 5;
-volatile int new_data = 0;
 // [space, up, down, left, right]
 volatile char commands[5];
 
@@ -37,12 +37,13 @@ volatile int right = 0;
 
 int currX = 3500;
 int currY = 0;
-int delay = 0;
+int delayX = 0;
+int delayY = 0;
 
 const int MAX = 5000;
 const int MIN = 950;
-const int DELAY_TIME = 10000;
-const int INCS = 50;
+const int DELAY_TIME = 100;
+const int INCS = 1;
 
 const int UP = 0;
 const int DOWN = 1;
@@ -67,12 +68,54 @@ void transmitString(char string[]) {
 		return;
 }
 
+void readCommands() {
+		while(!(USART3->ISR & 32)) {
+		}
+		commands[0] = USART3->RDR;
+		
+		while(!(USART3->ISR & 32)) {
+		}
+		commands[1] = USART3->RDR;
+		
+		while(!(USART3->ISR & 32)) {
+		}
+		commands[2] = USART3->RDR;
+
+		while(!(USART3->ISR & 32)) {
+		}
+		commands[3] = USART3->RDR;
+		
+		while(!(USART3->ISR & 32)) {
+		}
+		commands[4] = USART3->RDR;
+}
+
+void parseCommands() {
+		// PARSE COMMANDS
+		if (commands[0] == '1') space = 1; // space
+		else space = 0;
+		
+		if (commands[1] == '1') up = 1;	// up
+		else up = 0;
+		
+		if (commands[2] == '1') down = 1; // down
+		else down = 0;
+		
+		if (commands[3] == '1') left = 1; // left
+		else left = 0;
+		
+		if (commands[4] == '1') right = 1; // right
+		else right = 0;
+	
+}
+
 /**
 	* Interrupt for when data is ready to be read. Store
 	* data into commands array.
 	*
 	*/
 void USART3_4_IRQHandler() {
+	/*
 	if (new_data == 0) {
 		commands[0] = USART3->RDR;
 		new_data = 1;
@@ -93,17 +136,18 @@ void USART3_4_IRQHandler() {
 		commands[4] = USART3->RDR;
 		new_data = 5;
 	}
-
+	*/
 }
+
 
 void updateServoX(int direction) {
 	
-	if (delay < DELAY_TIME) {
-		delay++;
+	if (delayX < DELAY_TIME) {
+		delayX++;
 		return;
 	}
 	
-	delay = 0;
+	delayX = 0;
 	if (direction == LEFT) currX += INCS;
 	else if (direction == RIGHT) currX -= INCS;
 	else return;
@@ -114,16 +158,17 @@ void updateServoX(int direction) {
 	TIM3->CR1 &= ~(1 << 0);
 	TIM3->CCR1 = currX;
 	TIM3->CR1 |= (1 << 0);
+	
 }
 
 void updateServoY(int direction) {
 	
-	if (delay < DELAY_TIME) {
-		delay++;
+	if (delayY < DELAY_TIME) {
+		delayY++;
 		return;
 	}
 	
-	delay = 0;
+	delayY = 0;
 	if (direction == UP) currY += INCS;
 	else if (direction == DOWN) currY -= INCS;
 	else return;
@@ -134,6 +179,7 @@ void updateServoY(int direction) {
 	TIM3->CR1 &= ~(1 << 0);
 	TIM3->CCR2 = currY;
 	TIM3->CR1 |= (1 << 0);
+	
 }
 
 
@@ -153,7 +199,7 @@ int main(void)
 	// BLUE		-> 7
 	// RED		-> 6
 	// Set up a configuration struct to pass to the initialization function
-	GPIO_InitTypeDef initStr = {GPIO_PIN_9, // GPIO_PIN_6 | GPIO_PIN_7 | GPIO_PIN_8 | 
+	GPIO_InitTypeDef initStr = {GPIO_PIN_9 | GPIO_PIN_8, // GPIO_PIN_6 | GPIO_PIN_7 | 
 	GPIO_MODE_OUTPUT_PP,
 	GPIO_SPEED_FREQ_LOW,
 	GPIO_NOPULL};
@@ -161,15 +207,18 @@ int main(void)
 	//HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET); // Start PC6 reset
 	//HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_RESET); // Start PC7 reset
 	//HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET); // Start PC8 reset
-	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET); // Start PC9 reset
+	//HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET); // Start PC9 reset
+	
 	// UART SETUP ################################################################################################
 	// USART3_RX = PC5
 	// USART3_TX = PC4
-	// PI_TX = 8
-	// PI_RX = 10
+	// PI_TX = PI_PIN_8
+	// PI_RX = PI_PIN_10
+	// CHANNEL 1 (x) -> PC6
+	// CHANNEL 2 (y) -> PC7
 	// USB-UART Transmit 	(TX) -> STM32F0 Receive 	(RX)
 	// USB-UART Receive 	(RX) -> STM32F0 Transmit 	(TX)
-	
+
 	// enable system clock as USART3 clock
 	RCC->APB1ENR |= RCC_APB1ENR_USART3EN;
 	
@@ -207,14 +256,14 @@ int main(void)
 	USART3->BRR = f / target ;
 	
 	// interrupt enable
-	USART3->CR1 |= (1 << 5);
-	NVIC_EnableIRQ(29);
-	NVIC_SetPriority(29, 1);
+	//USART3->CR1 |= (1 << 5);
+	//NVIC_EnableIRQ(29);
+	//NVIC_SetPriority(29, 1);
 
 	USART3->CR1 |= (1 << 0);		// enable USART
-	
+
 	// PWM SETUP ################################################################################################
-	
+
 	// Initialize LEDs 
   // Blue LED (PC7)
 	// set to Alternate Function
@@ -284,57 +333,45 @@ int main(void)
 	
 	// ENABLE TIMER 3
 	TIM3->CR1 |= (1 << 0);
-	
 
-  while (1)
-  {
-		new_data = 0;
+  while (1) {
 		
-		// wait until all data (5 bytes) are received.
-		while(new_data != 5) {
+		if ((USART3->ISR & 32)) readCommands();
+		else {
 			
-			if (up == 1) {
-				HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_SET);
+			parseCommands();
+			
+			if (!up && !down && !left && !right) {
+				delayX = DELAY_TIME + 1;
+				delayY = DELAY_TIME + 1;
+				TIM3->CR1 &= ~(1 << 0);
+				TIM3->CCR1 = 0;
+				TIM3->CCR2 = 0;
+				TIM3->CR1 |= (1 << 0);
+				continue;
+			}
+			if (space) {
+				// TODO
+			}
+			
+			if (up) {
 				updateServoY(UP);
-				continue;
 			}
-			if (down == 1) {
-				HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_SET);
+			
+			else if (down) {
 				updateServoY(DOWN);
-				continue;
 			}
 			
-			if (left == 1) {
-				continue;
+			if (left) {
+				updateServoX(LEFT);
 			}
 			
-			if (right == 1) {
-				continue;
+			else if (right) {
+				updateServoX(RIGHT);
 			}
-			
-			HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET);
-			delay = DELAY_TIME + 1;
-			TIM3->CR1 &= ~(1 << 0);
-			TIM3->CCR2 = 0;
-			TIM3->CR1 |= (1 << 0);
-		}
-		
-		// PARSE COMMANDS
-		if (commands[0] == '1') space = 1; // space
-		else space = 0;
-		
-		if (commands[1] == '1') up = 1;	// up
-		else up = 0;
-		
-		if (commands[2] == '1') down = 1; // down
-		else down = 0;
-		
-		if (commands[3] == '1') left = 1; // left
-		else left = 0;
-		
-		if (commands[4] == '1') right = 1; // right
-		else right = 0;
 
+		}
+	}
 }
 
 /**
