@@ -68,26 +68,40 @@ void transmitString(char string[]) {
 		return;
 }
 
-void readCommands() {
+void readCommands() {	
+		int data0, data1, data2, data3, data4;
+	
 		while(!(USART3->ISR & 32)) {
 		}
-		commands[0] = USART3->RDR;
-		
-		while(!(USART3->ISR & 32)) {
-		}
-		commands[1] = USART3->RDR;
-		
-		while(!(USART3->ISR & 32)) {
-		}
-		commands[2] = USART3->RDR;
+		data0 = USART3->RDR;
+		if (data0 != '0' && data0 != '1') return;
 
 		while(!(USART3->ISR & 32)) {
 		}
-		commands[3] = USART3->RDR;
+		data1 = USART3->RDR;
+		if (data1 != '0' && data1 != '1') return;
 		
 		while(!(USART3->ISR & 32)) {
 		}
-		commands[4] = USART3->RDR;
+		data2 = USART3->RDR;
+		if (data2 != '0' && data2 != '1') return;
+		
+		while(!(USART3->ISR & 32)) {
+		}
+		data3 = USART3->RDR;
+		if (data3 != '0' && data3 != '1') return;
+		
+		while(!(USART3->ISR & 32)) {
+		}
+		data4 = USART3->RDR;
+		if (data4 != '0' && data4 != '1') return;
+		
+		//HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_9);
+		commands[0] = data0;
+		commands[1] = data1;
+		commands[2] = data2;
+		commands[3] = data3;
+		commands[4] = data4;
 }
 
 void parseCommands() {
@@ -206,8 +220,8 @@ int main(void)
 	HAL_GPIO_Init(GPIOC, &initStr); // Initialize pins PC6, PC7, PC8 & PC9
 	//HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET); // Start PC6 reset
 	//HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_RESET); // Start PC7 reset
-	//HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET); // Start PC8 reset
-	//HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET); // Start PC9 reset
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET); // Start PC8 reset
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET); // Start PC9 reset
 	
 	// UART SETUP ################################################################################################
 	// USART3_RX = PC5
@@ -333,12 +347,19 @@ int main(void)
 	
 	// ENABLE TIMER 3
 	TIM3->CR1 |= (1 << 0);
+	
+	// FLUSH ALL DATA IN RX BUFFER
+	USART3->RQR |= (1 << 3);
 
   while (1) {
 		
-		if ((USART3->ISR & 32)) readCommands();
+		if ((USART3->ISR & 32)) {
+			HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_9);
+			readCommands();
+			// FLUSH ALL DATA IN RX BUFFER
+			USART3->RQR |= (1 << 3);
+		}
 		else {
-			
 			parseCommands();
 			
 			if (!up && !down && !left && !right) {
