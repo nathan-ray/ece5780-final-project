@@ -24,22 +24,11 @@ void updateServoX(int direction);
 void updateServoY(int direction);
 void readCommands();
 void parseCommands();
+void uart_init();
+void servos_init();
+void water_level_init();
 
-// [space, up, down, left, right]
-volatile char commands[5];
-
-// variables
-volatile int space = 0;
-volatile int up = 0;
-volatile int down = 0;
-volatile int left = 0;
-volatile int right = 0;
-
-int currX = 3500;
-int currY = 0;
-int delayX = 0;
-int delayY = 0;
-
+// CONSTS
 const int MAX = 5000;
 const int MIN = 950;
 const int DELAY_TIME = 100;
@@ -49,6 +38,26 @@ const int UP = 0;
 const int DOWN = 1;
 const int LEFT = 2;
 const int RIGHT = 3;
+
+// variables
+
+// [space, up, down, left, right]
+volatile char commands[5];
+
+volatile int space = 0;
+volatile int up = 0;
+volatile int down = 0;
+volatile int left = 0;
+volatile int right = 0;
+
+volatile int interrupt_loop = 0;
+
+int currX = 3500;
+int currY = 0;
+int delayX = 0;
+int delayY = 0;
+
+
 
 void transmitChar(char c) {
 	// continue looping if transmit data register is empty, continue when there is data
@@ -153,6 +162,23 @@ void USART3_4_IRQHandler() {
 	*/
 }
 
+/**
+	* Interrupt for when water level sensor is triggered.
+	*
+	*/
+void EXTI4_15_IRQHandler() {
+	HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_9);
+	//HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET); // Start PC9 high
+	
+	while (interrupt_loop != 150000) {
+		interrupt_loop += 1;
+	}
+	
+	// clear pending register
+	EXTI->PR |= (1 << 10);
+	interrupt_loop = 0;
+}
+
 
 void updateServoX(int direction) {
 	
@@ -196,43 +222,7 @@ void updateServoY(int direction) {
 	
 }
 
-
-/**
-  * @brief  The application entry point.
-  * @retval int
-  */
-int main(void)
-{
-  HAL_Init();
-  SystemClock_Config();
-	
-	// LED SETUP ################################################################################################
-	__HAL_RCC_GPIOC_CLK_ENABLE(); // Enable the GPIOC clock in the RCC
-	// GREEN  -> 9
-	// ORANGE -> 8
-	// BLUE		-> 7
-	// RED		-> 6
-	// Set up a configuration struct to pass to the initialization function
-	GPIO_InitTypeDef initStr = {GPIO_PIN_9 | GPIO_PIN_8, // GPIO_PIN_6 | GPIO_PIN_7 | 
-	GPIO_MODE_OUTPUT_PP,
-	GPIO_SPEED_FREQ_LOW,
-	GPIO_NOPULL};
-	HAL_GPIO_Init(GPIOC, &initStr); // Initialize pins PC6, PC7, PC8 & PC9
-	//HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET); // Start PC6 reset
-	//HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_RESET); // Start PC7 reset
-	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET); // Start PC8 reset
-	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET); // Start PC9 reset
-	
-	// UART SETUP ################################################################################################
-	// USART3_RX = PC5
-	// USART3_TX = PC4
-	// PI_TX = PI_PIN_8
-	// PI_RX = PI_PIN_10
-	// CHANNEL 1 (x) -> PC6
-	// CHANNEL 2 (y) -> PC7
-	// USB-UART Transmit 	(TX) -> STM32F0 Receive 	(RX)
-	// USB-UART Receive 	(RX) -> STM32F0 Transmit 	(TX)
-
+void uart_init() {
 	// enable system clock as USART3 clock
 	RCC->APB1ENR |= RCC_APB1ENR_USART3EN;
 	
@@ -275,9 +265,10 @@ int main(void)
 	//NVIC_SetPriority(29, 1);
 
 	USART3->CR1 |= (1 << 0);		// enable USART
+}
 
-	// PWM SETUP ################################################################################################
-
+void servos_init() {
+	
 	// Initialize LEDs 
   // Blue LED (PC7)
 	// set to Alternate Function
@@ -350,6 +341,76 @@ int main(void)
 	
 	// FLUSH ALL DATA IN RX BUFFER
 	USART3->RQR |= (1 << 3);
+}
+
+void water_sensor_init() {
+	// enable INPUT FOR PIN PC10
+	GPIOC->MODER &= ~(1 << 21);
+	GPIOC->MODER &= ~(1 << 20);
+	// set speed to low
+	GPIOC->OSPEEDR &= ~(1 << 20);
+	// pull down
+	GPIOC->PUPDR |= (1 << 21);
+	GPIOC->PUPDR &= ~(1 << 20);
+	
+	// unmask interrupt
+	EXTI->IMR |= (1 << 10);
+	// rising edge enable
+	EXTI->RTSR |= (1 << 10);
+	// enable SYSCFG clk
+	RCC->APB2ENR |= (1 << 0);
+	// routing PC10 to EXTI10 (11, 10, 9, 8), (PC -> x010)
+	SYSCFG->EXTICR[2] &= ~(1 << 10);
+	SYSCFG->EXTICR[2] |= (1 << 9);
+	SYSCFG->EXTICR[2] &= ~(1 << 8);
+	
+	// enable and prioritize EXTI
+	//NVIC_EnableIRQ(7);
+	//NVIC_SetPriority(7, 3);
+}
+
+
+/**
+  * @brief  The application entry point.
+  * @retval int
+  */
+int main(void)
+{
+  HAL_Init();
+  SystemClock_Config();
+	__HAL_RCC_GPIOC_CLK_ENABLE(); // Enable the GPIOC clock in the RCC
+	
+	// LED SETUP ################################################################################################
+	// GREEN  -> 9
+	// ORANGE -> 8
+	// BLUE		-> 7
+	// RED		-> 6
+	// Set up a configuration struct to pass to the initialization function
+	GPIO_InitTypeDef initStr = {GPIO_PIN_9 | GPIO_PIN_8, // GPIO_PIN_6 | GPIO_PIN_7 | 
+	GPIO_MODE_OUTPUT_PP,
+	GPIO_SPEED_FREQ_LOW,
+	GPIO_NOPULL};
+	HAL_GPIO_Init(GPIOC, &initStr); // Initialize pins PC6, PC7, PC8 & PC9
+	//HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET); // Start PC6 reset
+	//HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_RESET); // Start PC7 reset
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET); // Start PC8 reset
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET); // Start PC9 reset
+	
+	
+	// PI_TX = PI_PIN_8
+	// PI_RX = PI_PIN_10
+	// USART3_RX = PC5
+	// USART3_TX = PC4
+	// CHANNEL 1 (x) -> PC6
+	// CHANNEL 2 (y) -> PC7
+	// water_sensor -> PC10
+	// USB-UART Transmit 	(TX) -> STM32F0 Receive 	(RX)
+	// USB-UART Receive 	(RX) -> STM32F0 Transmit 	(TX)
+	uart_init();
+	
+	servos_init();
+	
+	water_sensor_init();
 
   while (1) {
 		
