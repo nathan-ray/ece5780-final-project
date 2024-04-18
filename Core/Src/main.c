@@ -51,6 +51,7 @@ volatile int left = 0;
 volatile int right = 0;
 
 volatile int interrupt_loop = 0;
+volatile int inWater = 0;
 
 int currX = 3500;
 int currY = 0;
@@ -163,14 +164,20 @@ void USART3_4_IRQHandler() {
 }
 
 /**
-	* Interrupt for when water level sensor is triggered.
-	*
-	*/
+* Interrupt for when water level sensor is triggered.
+*
+*/
 void EXTI4_15_IRQHandler() {
-	HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_9);
-	//HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET); // Start PC9 high
+	if (GPIOC->IDR & 0x400) {	// not in water
+		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET); // Start PC9 reset
+		inWater = 0;
+	}
+	else {
+		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_SET); // Start PC9 reset
+		inWater = 1;			// in water
+	} 
 	
-	while (interrupt_loop != 150000) {
+	while (interrupt_loop != 10000) {
 		interrupt_loop += 1;
 	}
 	
@@ -209,8 +216,8 @@ void updateServoY(int direction) {
 	}
 	
 	delayY = 0;
-	if (direction == UP) currY += INCS;
-	else if (direction == DOWN) currY -= INCS;
+	if (direction == UP) currY -= INCS;
+	else if (direction == DOWN) currY += INCS;
 	else return;
 	
 	if (currY > MAX) currY = MAX;
@@ -333,8 +340,8 @@ void servos_init() {
 	// 45 deg 	-> 3750
 	// 90 deg 	-> 4550
 	
-  TIM3->CCR1 = currX;
-  TIM3->CCR2 = currY;
+	TIM3->CCR1 = currX;
+	TIM3->CCR2 = currY;
 	
 	// ENABLE TIMER 3
 	TIM3->CR1 |= (1 << 0);
@@ -357,6 +364,8 @@ void water_sensor_init() {
 	EXTI->IMR |= (1 << 10);
 	// rising edge enable
 	EXTI->RTSR |= (1 << 10);
+	// falling edge enable
+	EXTI->FTSR |= (1 << 10);
 	// enable SYSCFG clk
 	RCC->APB2ENR |= (1 << 0);
 	// routing PC10 to EXTI10 (11, 10, 9, 8), (PC -> x010)
@@ -365,8 +374,8 @@ void water_sensor_init() {
 	SYSCFG->EXTICR[2] &= ~(1 << 8);
 	
 	// enable and prioritize EXTI
-	//NVIC_EnableIRQ(7);
-	//NVIC_SetPriority(7, 3);
+	NVIC_EnableIRQ(7);
+	NVIC_SetPriority(7, 3);
 }
 
 
@@ -381,12 +390,12 @@ int main(void)
 	__HAL_RCC_GPIOC_CLK_ENABLE(); // Enable the GPIOC clock in the RCC
 	
 	// LED SETUP ################################################################################################
-	// GREEN  -> 9
-	// ORANGE -> 8
+	// GREEN  -> 9 (ORANGE)
+	// ORANGE -> 8 (GREEN)
 	// BLUE		-> 7
 	// RED		-> 6
 	// Set up a configuration struct to pass to the initialization function
-	GPIO_InitTypeDef initStr = {GPIO_PIN_9 | GPIO_PIN_8, // GPIO_PIN_6 | GPIO_PIN_7 | 
+	GPIO_InitTypeDef initStr = {GPIO_PIN_9 | GPIO_PIN_8 | GPIO_PIN_0, // GPIO_PIN_6 | GPIO_PIN_7 | 
 	GPIO_MODE_OUTPUT_PP,
 	GPIO_SPEED_FREQ_LOW,
 	GPIO_NOPULL};
@@ -395,6 +404,7 @@ int main(void)
 	//HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_RESET); // Start PC7 reset
 	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET); // Start PC8 reset
 	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET); // Start PC9 reset
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, GPIO_PIN_RESET); // Start PC0 reset
 	
 	
 	// PI_TX = PI_PIN_8
@@ -404,6 +414,7 @@ int main(void)
 	// CHANNEL 1 (x) -> PC6
 	// CHANNEL 2 (y) -> PC7
 	// water_sensor -> PC10
+	// motor_sensor -> PC0
 	// USB-UART Transmit 	(TX) -> STM32F0 Receive 	(RX)
 	// USB-UART Receive 	(RX) -> STM32F0 Transmit 	(TX)
 	uart_init();
@@ -415,7 +426,7 @@ int main(void)
   while (1) {
 		
 		if ((USART3->ISR & 32)) {
-			HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_9);
+			//HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_9);
 			readCommands();
 			// FLUSH ALL DATA IN RX BUFFER
 			USART3->RQR |= (1 << 3);
@@ -430,11 +441,18 @@ int main(void)
 				TIM3->CCR1 = 0;
 				TIM3->CCR2 = 0;
 				TIM3->CR1 |= (1 << 0);
-				continue;
 			}
-			if (space) {
-				// TODO
+			
+			NVIC_DisableIRQ(7);
+			if (space && inWater) {
+				HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_SET);
+				HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, GPIO_PIN_SET);
 			}
+			else {
+				HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET);
+				HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, GPIO_PIN_RESET);
+			}
+			NVIC_EnableIRQ(7);
 			
 			if (up) {
 				updateServoY(UP);
