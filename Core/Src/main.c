@@ -59,7 +59,9 @@ int delayX = 0;
 int delayY = 0;
 
 
-
+/**
+  * Transmits a character to the UART channel.
+  */
 void transmitChar(char c) {
 	// continue looping if transmit data register is empty, continue when there is data
 	while ( (USART3->ISR & 128) == 0) {
@@ -69,104 +71,85 @@ void transmitChar(char c) {
 	return;
 }
 
+/**
+  * Transmits a char array to the UART channel by
+  * calling the transmitChar method.
+  */
 void transmitString(char string[]) {
-		int i = 0;
-		while (string[i] != 0) {
-			transmitChar(string[i]);
-			i++;
-		}
-		return;
+	int i = 0;
+	while (string[i] != 0) {
+		transmitChar(string[i]);
+		i++;
+	}
+	return;
 }
 
+/**
+  * Reads the commands from the UART channel and parses
+  * it to the commands array.
+  */
 void readCommands() {	
-		int data0, data1, data2, data3, data4;
+	int data0, data1, data2, data3, data4;
+
+	while(!(USART3->ISR & 32)) {
+	}
+	data0 = USART3->RDR;
+	if (data0 != '0' && data0 != '1') return;
+
+	while(!(USART3->ISR & 32)) {
+	}
+	data1 = USART3->RDR;
+	if (data1 != '0' && data1 != '1') return;
 	
-		while(!(USART3->ISR & 32)) {
-		}
-		data0 = USART3->RDR;
-		if (data0 != '0' && data0 != '1') return;
-
-		while(!(USART3->ISR & 32)) {
-		}
-		data1 = USART3->RDR;
-		if (data1 != '0' && data1 != '1') return;
-		
-		while(!(USART3->ISR & 32)) {
-		}
-		data2 = USART3->RDR;
-		if (data2 != '0' && data2 != '1') return;
-		
-		while(!(USART3->ISR & 32)) {
-		}
-		data3 = USART3->RDR;
-		if (data3 != '0' && data3 != '1') return;
-		
-		while(!(USART3->ISR & 32)) {
-		}
-		data4 = USART3->RDR;
-		if (data4 != '0' && data4 != '1') return;
-		
-		//HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_9);
-		commands[0] = data0;
-		commands[1] = data1;
-		commands[2] = data2;
-		commands[3] = data3;
-		commands[4] = data4;
-}
-
-void parseCommands() {
-		// PARSE COMMANDS
-		if (commands[0] == '1') space = 1; // space
-		else space = 0;
-		
-		if (commands[1] == '1') up = 1;	// up
-		else up = 0;
-		
-		if (commands[2] == '1') down = 1; // down
-		else down = 0;
-		
-		if (commands[3] == '1') left = 1; // left
-		else left = 0;
-		
-		if (commands[4] == '1') right = 1; // right
-		else right = 0;
+	while(!(USART3->ISR & 32)) {
+	}
+	data2 = USART3->RDR;
+	if (data2 != '0' && data2 != '1') return;
 	
+	while(!(USART3->ISR & 32)) {
+	}
+	data3 = USART3->RDR;
+	if (data3 != '0' && data3 != '1') return;
+	
+	while(!(USART3->ISR & 32)) {
+	}
+	data4 = USART3->RDR;
+	if (data4 != '0' && data4 != '1') return;
+	
+	//HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_9);
+	commands[0] = data0;
+	commands[1] = data1;
+	commands[2] = data2;
+	commands[3] = data3;
+	commands[4] = data4;
 }
 
-/**
-	* Interrupt for when data is ready to be read. Store
-	* data into commands array.
-	*
-	*/
-void USART3_4_IRQHandler() {
-	/*
-	if (new_data == 0) {
-		commands[0] = USART3->RDR;
-		new_data = 1;
-	}
-	else if (new_data == 1) {
-		commands[1] = USART3->RDR;
-		new_data = 2;
-	}
-	else if (new_data == 2) {
-		commands[2] = USART3->RDR;
-		new_data = 3;
-	}
-	else if (new_data == 3) {
-		commands[3] = USART3->RDR;
-		new_data = 4;
-	}
-	else if (new_data == 4) {
-		commands[4] = USART3->RDR;
-		new_data = 5;
-	}
-	*/
-}
 
-/**
-* Interrupt for when water level sensor is triggered.
-*
+/*
+* Parses the commands from the commands array
+* to each flags.
 */
+void parseCommands() {
+	// PARSE COMMANDS
+	if (commands[0] == '1') space = 1; // space
+	else space = 0;
+	
+	if (commands[1] == '1') up = 1;	// up
+	else up = 0;
+	
+	if (commands[2] == '1') down = 1; // down
+	else down = 0;
+	
+	if (commands[3] == '1') left = 1; // left
+	else left = 0;
+	
+	if (commands[4] == '1') right = 1; // right
+	else right = 0;	
+}
+
+/**
+  * Interrupt for when water level sensor is triggered.
+  */
 void EXTI4_15_IRQHandler() {
 	if (GPIOC->IDR & 0x400) {	// not in water
 		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET); // Start PC9 reset
@@ -186,7 +169,10 @@ void EXTI4_15_IRQHandler() {
 	interrupt_loop = 0;
 }
 
-
+/**
+  * Updates the x axis servo where direction is either
+  * left or right.
+  */
 void updateServoX(int direction) {
 	
 	if (delayX < DELAY_TIME) {
@@ -208,6 +194,10 @@ void updateServoX(int direction) {
 	
 }
 
+/**
+  * Updats the y axis servo to where direction is either
+  * up or down.
+  */
 void updateServoY(int direction) {
 	
 	if (delayY < DELAY_TIME) {
@@ -229,6 +219,10 @@ void updateServoY(int direction) {
 	
 }
 
+/**
+  * Initializes UART connection and GPIO pins with the RPi5.
+  *
+  */
 void uart_init() {
 	// enable system clock as USART3 clock
 	RCC->APB1ENR |= RCC_APB1ENR_USART3EN;
@@ -274,31 +268,36 @@ void uart_init() {
 	USART3->CR1 |= (1 << 0);		// enable USART
 }
 
+/**
+  * Initializes the GPIO pins that interfaces
+  * with the servos which uses PWM signals.
+  *
+  */
 void servos_init() {
 	
 	// Initialize LEDs 
-  // Blue LED (PC7)
+	// Blue LED (PC7)
 	// set to Alternate Function
-  GPIOC->MODER &= ~(1 << 14);
-  GPIOC->MODER |= (1 << 15);
-	
-  GPIOC->OTYPER &= ~(1 << 7);
-  GPIOC->OSPEEDR &= ~(1 << 14);
-  GPIOC->OSPEEDR &= ~(1 << 15);
-  GPIOC->PUPDR &= ~(1 << 14);
-  GPIOC->PUPDR &= ~(1 << 15);
+	GPIOC->MODER &= ~(1 << 14);
+	GPIOC->MODER |= (1 << 15);
 
-  // Red LED (PC6)
+	GPIOC->OTYPER &= ~(1 << 7);
+	GPIOC->OSPEEDR &= ~(1 << 14);
+	GPIOC->OSPEEDR &= ~(1 << 15);
+	GPIOC->PUPDR &= ~(1 << 14);
+	GPIOC->PUPDR &= ~(1 << 15);
+
+	// Red LED (PC6)
 	// set to Alternate Function
-  GPIOC->MODER &= ~(1 << 12);
-  GPIOC->MODER |= (1 << 13);
-	
-  GPIOC->OTYPER &= ~(1 << 6);
-  GPIOC->OSPEEDR &= ~(1 << 12);
-  GPIOC->OSPEEDR &= ~(1 << 13);
-  GPIOC->PUPDR &= ~(1 << 12); 
-  GPIOC->PUPDR &= ~(1 << 13); 
-	
+	GPIOC->MODER &= ~(1 << 12);
+	GPIOC->MODER |= (1 << 13);
+
+	GPIOC->OTYPER &= ~(1 << 6);
+	GPIOC->OSPEEDR &= ~(1 << 12);
+	GPIOC->OSPEEDR &= ~(1 << 13);
+	GPIOC->PUPDR &= ~(1 << 12); 
+	GPIOC->PUPDR &= ~(1 << 13); 
+
 	// ENABLE TIM3
 	RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;
 
@@ -306,9 +305,9 @@ void servos_init() {
 	// 50 = 8 000 000 / ( (PSC + 1) * ARR )
 	// PSC + 1 = 4, PSC = 3
 	// ARR = 50000
-  TIM3->PSC = 3;
-  TIM3->ARR = 50000;
-	
+	TIM3->PSC = 3;
+	TIM3->ARR = 50000;
+
 	// PC6 -> CHANNEL 1 
 	// SET OUTPUT for channel 1
 	TIM3->CCMR1 &= ~(1 << 1);
@@ -321,7 +320,7 @@ void servos_init() {
 	TIM3->CCER |= (1 << 0);
 	// ENABLE PRELOAD for channel 1
 	TIM3->CCMR1 |= (1 << 3);
-	
+
 	// PC7 -> CHANNEL 2
 	// SET OUTPUT for channel 2
 	TIM3->CCMR1 &= ~(1 << 9);
@@ -334,22 +333,26 @@ void servos_init() {
 	TIM3->CCER |= (1 << 4);
 	// ENABLE PRELOAD for channel 2
 	TIM3->CCMR1 |= (1 << 11);
-	
+
 	// ADJUST DUTY-CYCLE WHERE FOR SERVOS (NOT THOROUGHLY TESTED)
 	// 0 deg 		-> 2500
 	// 45 deg 	-> 3750
 	// 90 deg 	-> 4550
-	
+
 	TIM3->CCR1 = currX;
 	TIM3->CCR2 = currY;
-	
+
 	// ENABLE TIMER 3
 	TIM3->CR1 |= (1 << 0);
-	
+
 	// FLUSH ALL DATA IN RX BUFFER
 	USART3->RQR |= (1 << 3);
 }
 
+/**
+  * Initializes the GPIO pins that interfaces
+  * with the water level sensor.
+  */
 void water_sensor_init() {
 	// enable INPUT FOR PIN PC10
 	GPIOC->MODER &= ~(1 << 21);
@@ -385,8 +388,8 @@ void water_sensor_init() {
   */
 int main(void)
 {
-  HAL_Init();
-  SystemClock_Config();
+	HAL_Init();
+	SystemClock_Config();
 	__HAL_RCC_GPIOC_CLK_ENABLE(); // Enable the GPIOC clock in the RCC
 	
 	// LED SETUP ################################################################################################
@@ -400,12 +403,11 @@ int main(void)
 	GPIO_SPEED_FREQ_LOW,
 	GPIO_NOPULL};
 	HAL_GPIO_Init(GPIOC, &initStr); // Initialize pins PC6, PC7, PC8 & PC9
-	//HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET); // Start PC6 reset
-	//HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_RESET); // Start PC7 reset
 	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_RESET); // Start PC8 reset
 	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET); // Start PC9 reset
 	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, GPIO_PIN_RESET); // Start PC0 reset
 	
+	// PINS USED
 	// PI_TX = PI_PIN_8
 	// PI_RX = PI_PIN_10
 	// USART3_RX = PC5
@@ -416,23 +418,23 @@ int main(void)
 	// motor_sensor -> PC0
 	// USB-UART Transmit 	(TX) -> STM32F0 Receive 	(RX)
 	// USB-UART Receive 	(RX) -> STM32F0 Transmit 	(TX)
+	
 	uart_init();
 	
 	servos_init();
 	
 	water_sensor_init();
 
-  while (1) {
-		
-		if ((USART3->ISR & 32)) {
+	while (1) {	
+			if ((USART3->ISR & 32)) {
 			//HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_9);
 			readCommands();
 			// FLUSH ALL DATA IN RX BUFFER
 			USART3->RQR |= (1 << 3);
-		}
-		else {
+			}
+			else {
 			parseCommands();
-			
+
 			if (!up && !down && !left && !right) {
 				delayX = DELAY_TIME + 1;
 				delayY = DELAY_TIME + 1;
@@ -441,7 +443,7 @@ int main(void)
 				TIM3->CCR2 = 0;
 				TIM3->CR1 |= (1 << 0);
 			}
-			
+
 			NVIC_DisableIRQ(7);
 			if (space && inWater) {
 				HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_SET);
@@ -452,23 +454,22 @@ int main(void)
 				HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, GPIO_PIN_RESET);
 			}
 			NVIC_EnableIRQ(7);
-			
+
 			if (up) {
 				updateServoY(UP);
 			}
-			
+
 			else if (down) {
 				updateServoY(DOWN);
 			}
-			
+
 			if (left) {
 				updateServoX(LEFT);
 			}
-			
+
 			else if (right) {
 				updateServoX(RIGHT);
 			}
-
 		}
 	}
 }
