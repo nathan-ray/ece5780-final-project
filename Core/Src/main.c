@@ -406,7 +406,6 @@ int main(void)
 	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_RESET); // Start PC9 reset
 	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, GPIO_PIN_RESET); // Start PC0 reset
 	
-	
 	// PI_TX = PI_PIN_8
 	// PI_RX = PI_PIN_10
 	// USART3_RX = PC5
